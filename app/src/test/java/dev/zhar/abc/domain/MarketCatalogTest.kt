@@ -6,9 +6,9 @@ import org.junit.Test
 
 class MarketCatalogTest {
     @Test
-    fun `market contains twenty distinct USD products`() {
-        assertEquals(20, AssetCatalog.defaults.size)
-        assertEquals(20, AssetCatalog.defaults.map { it.symbol }.distinct().size)
+    fun `market contains forty distinct USD products`() {
+        assertEquals(40, AssetCatalog.defaults.size)
+        assertEquals(40, AssetCatalog.defaults.map { it.symbol }.distinct().size)
         assertTrue(AssetCatalog.defaults.all { it.productId.endsWith("-USD") })
     }
 }
