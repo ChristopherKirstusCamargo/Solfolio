@@ -1,0 +1,43 @@
+name: Build and publish Solfolio v0.6.3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Validate and build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+
+      - name: Name APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk Solfolio-v0.6.3-debug.apk
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.6.3 >/dev/null 2>&1; then
+            gh release upload v0.6.3 Solfolio-v0.6.3-debug.apk --clobber
+          else
+            gh release create v0.6.3 Solfolio-v0.6.3-debug.apk \
+              --title "Solfolio v0.6.3" \
+              --notes "Hotfix de carteiras de doação e base V6 do Solfolio. APK de depuração para instalação e testes."
+          fi

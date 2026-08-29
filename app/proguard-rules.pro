@@ -1,0 +1,2 @@
+-keep class dev.zhar.abc.data.local.** { *; }
+-dontwarn org.conscrypt.**
