@@ -69,8 +69,8 @@ object PortfolioCalculator {
             expectedHighUsd = total * (1.0 + expectedMove / 100.0),
             trackedWalletCount = trackedPositions.map { it.walletId }.distinct().size,
             trackedValueUsd = watched.sumOf { it.currentValueUsd },
-            pnlIsEstimated = trackedPositions.any { !it.basisIsExact },
-            pnlCoveragePercent = if (cost > EPSILON) exactCost / cost * 100.0 else 100.0,
+            pnlIsEstimated = holdings.any { !it.basisIsExact },
+            pnlCoveragePercent = if (cost > EPSILON) exactCost / cost * 100.0 else if (holdings.all { it.basisIsExact }) 100.0 else 0.0,
             dataCoveragePercent = if (total > EPSILON) pricedValue / total * 100.0 else 0.0,
             sourceCount = holdings.map { it.sourceKey }.distinct().size,
             best24hSymbol = changed.maxByOrNull { it.change24hPercent ?: Double.NEGATIVE_INFINITY }?.symbol,
@@ -82,9 +82,11 @@ object PortfolioCalculator {
         var quantity = 0.0
         var cost = 0.0
         var realized = 0.0
+        var basisKnown = true
         entries.forEach { entry ->
             when (entry.kind) {
                 TransactionKind.BUY -> {
+                    if (entry.unitPriceUsd <= 0.0) basisKnown = false
                     quantity += entry.quantity
                     cost += entry.quantity * entry.unitPriceUsd + entry.feeUsd
                 }
@@ -92,7 +94,9 @@ object PortfolioCalculator {
                     if (quantity <= EPSILON) return@forEach
                     val sold = entry.quantity.coerceAtMost(quantity)
                     val removedCost = cost / quantity * sold
-                    realized += sold * entry.unitPriceUsd - entry.feeUsd - removedCost
+                    if (basisKnown && entry.unitPriceUsd > 0.0) {
+                        realized += sold * entry.unitPriceUsd - entry.feeUsd - removedCost
+                    }
                     quantity -= sold
                     cost = (cost - removedCost).coerceAtLeast(0.0)
                 }
@@ -101,8 +105,9 @@ object PortfolioCalculator {
         if (quantity <= EPSILON) return null
         val price = quote?.priceUsd?.takeIf { it > 0.0 } ?: entries.last().unitPriceUsd
         val value = quantity * price
+        val exactBasis = basisKnown
         return Holding(sourceKey, sourceLabel, symbol, entries.last().assetName, quantity, cost / quantity, cost, price, value,
-            value - cost, realized, quote?.change24hPercent, 0.0, quote?.recentPrices.orEmpty(), quote != null, true)
+            if (exactBasis) value - cost else 0.0, realized, quote?.change24hPercent, 0.0, quote?.recentPrices.orEmpty(), quote != null, exactBasis)
     }
 
     private fun calculateTrackedHolding(position: TrackedPosition, quote: AssetQuote?): Holding? {

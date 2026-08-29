@@ -183,6 +183,7 @@ fun HeroBalanceCard(
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    val balanceText = hiddenOr(formatMoney(snapshot.totalValueUsd, settings), settings.hideBalances)
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
@@ -192,7 +193,7 @@ fun HeroBalanceCard(
             modifier = Modifier
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(primary.copy(alpha = .42f), tertiary.copy(alpha = .74f), secondary.copy(alpha = .22f)),
+                        colors = listOf(Color(0xFF17152E), Color(0xFF202044), Color(0xFF101B2E), primary.copy(alpha = .18f)),
                         start = Offset.Zero,
                         end = Offset.Infinite,
                     ),
@@ -223,10 +224,12 @@ fun HeroBalanceCard(
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = hiddenOr(formatMoney(snapshot.totalValueUsd, settings), settings.hideBalances),
+                    text = balanceText,
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = when { balanceText.length <= 15 -> 40.sp; balanceText.length <= 19 -> 33.sp; balanceText.length <= 23 -> 27.sp; else -> 22.sp },
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(if (snapshot.pnlIsEstimated) "P/L estimado" else "P/L não realizado", color = Color.White.copy(alpha = .64f), style = MaterialTheme.typography.bodyMedium)

@@ -85,6 +85,8 @@ interface AbcDao {
     @Query("SELECT COALESCE(SUM(CASE WHEN kind = 'BUY' THEN quantity WHEN kind = 'SELL' THEN -quantity ELSE 0 END), 0) FROM ledger_entries WHERE portfolioId = :portfolioId AND symbol = :symbol")
     suspend fun availableManualQuantity(portfolioId: Long, symbol: String): Double
     @Query("DELETE FROM assets WHERE symbol = :symbol AND isCustom = 1") suspend fun deleteCustomAsset(symbol: String): Int
+    @Query("DELETE FROM ledger_entries WHERE portfolioId = :portfolioId AND symbol = :symbol")
+    suspend fun deleteManualPosition(portfolioId: Long, symbol: String): Int
     @Query("DELETE FROM portfolio_daily_snapshots WHERE capturedAt < :before") suspend fun prunePortfolioHistory(before: Long)
 
     @Transaction

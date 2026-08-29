@@ -10,7 +10,6 @@ import dev.zhar.abc.data.market.EthereumWalletService
 import dev.zhar.abc.data.market.MarketPriceService
 import dev.zhar.abc.data.market.SolanaWalletService
 import dev.zhar.abc.data.market.HistoricalPriceService
-import dev.zhar.abc.data.billing.ProBillingManager
 import dev.zhar.abc.data.backup.BackupManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +37,6 @@ class AbcApplication : Application() {
     val ethereumWalletService by lazy { EthereumWalletService(httpClient) }
     val historicalPriceService by lazy { HistoricalPriceService(httpClient) }
     val fxRateService by lazy { FxRateService(settingsStore, httpClient) }
-    val proBillingManager by lazy { ProBillingManager(this, settingsStore) }
     val backupManager by lazy { BackupManager(database.dao(), settingsStore) }
 
     override fun onCreate() {

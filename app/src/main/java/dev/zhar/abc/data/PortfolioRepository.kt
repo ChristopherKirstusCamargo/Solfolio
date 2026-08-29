@@ -116,6 +116,10 @@ class PortfolioRepository(private val dao: AbcDao) {
         require(dao.deleteCustomAsset(normalized) > 0) { "Somente ativos personalizados podem ser removidos." }
     }
 
+    suspend fun deleteManualPosition(portfolioId: Long, symbol: String) {
+        require(dao.deleteManualPosition(portfolioId, symbol.trim().uppercase()) > 0) { "Nenhum lançamento encontrado para remover." }
+    }
+
     suspend fun addLedgerEntry(draft: LedgerEntryDraft): Long {
         val symbol = draft.asset.symbol.trim().uppercase()
         if (draft.kind == TransactionKind.SELL) {

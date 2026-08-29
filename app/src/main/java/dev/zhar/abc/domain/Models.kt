@@ -7,9 +7,14 @@ enum class ThemePreference {
     AMOLED,
 }
 
-enum class DisplayCurrency {
-    BRL,
-    USD,
+enum class DisplayCurrency(val currencyCode: String, val fallbackPerUsd: Double) {
+    BRL("BRL", 5.50), USD("USD", 1.0), EUR("EUR", .92), GBP("GBP", .79),
+    JPY("JPY", 150.0), CAD("CAD", 1.36), AUD("AUD", 1.52), CHF("CHF", .88),
+    CNY("CNY", 7.20), HKD("HKD", 7.82), SGD("SGD", 1.34), NZD("NZD", 1.65),
+    MXN("MXN", 17.0), ARS("ARS", 1_050.0), CLP("CLP", 960.0), COP("COP", 4_100.0),
+    PEN("PEN", 3.75), UYU("UYU", 42.0), INR("INR", 86.0), KRW("KRW", 1_450.0),
+    TRY("TRY", 36.0), ZAR("ZAR", 18.5), SEK("SEK", 10.5), NOK("NOK", 11.0),
+    DKK("DKK", 6.86), PLN("PLN", 4.0),
 }
 
 enum class ColorPalette {
@@ -27,6 +32,10 @@ enum class PriceRefreshSpeed(val intervalMs: Long) {
     MEDIUM(15_000L),
     HIGH(5_000L),
     INSTANT(500L),
+}
+
+enum class LockTimeout(val timeoutMs: Long) {
+    INSTANT(0L), ONE_MINUTE(60_000L), FIVE_MINUTES(300_000L), TEN_MINUTES(600_000L),
 }
 
 enum class TransactionKind {
@@ -53,21 +62,13 @@ data class AppSettings(
     val hideBalances: Boolean = false,
     val biometricLock: Boolean = false,
     val secureScreen: Boolean = false,
-    val interactionFeedback: Boolean = true,
-    val proEntitled: Boolean = false,
     val colorPalette: ColorPalette = ColorPalette.SOLANA,
     val priceRefreshSpeed: PriceRefreshSpeed = PriceRefreshSpeed.MEDIUM,
+    val lockTimeout: LockTimeout = LockTimeout.ONE_MINUTE,
     val lastDestination: String = "HOME",
     val brlPerUsd: Double = 5.50,
+    val fiatPerUsd: Map<DisplayCurrency, Double> = DisplayCurrency.entries.associateWith { it.fallbackPerUsd },
     val fxUpdatedAt: Long = 0L,
-)
-
-data class ProStatus(
-    val owned: Boolean = false,
-    val pending: Boolean = false,
-    val available: Boolean = false,
-    val formattedPrice: String = "R$ 16,90",
-    val message: String? = null,
 )
 
 data class AssetDefinition(
@@ -98,6 +99,26 @@ object AssetCatalog {
         AssetDefinition("ATOM", "Cosmos", "ATOM-USD"),
         AssetDefinition("NEAR", "NEAR Protocol", "NEAR-USD"),
         AssetDefinition("AAVE", "Aave", "AAVE-USD"),
+        AssetDefinition("SUI", "Sui", "SUI-USD"),
+        AssetDefinition("HBAR", "Hedera", "HBAR-USD"),
+        AssetDefinition("ICP", "Internet Computer", "ICP-USD"),
+        AssetDefinition("ETC", "Ethereum Classic", "ETC-USD"),
+        AssetDefinition("FIL", "Filecoin", "FIL-USD"),
+        AssetDefinition("ARB", "Arbitrum", "ARB-USD"),
+        AssetDefinition("OP", "Optimism", "OP-USD"),
+        AssetDefinition("INJ", "Injective", "INJ-USD"),
+        AssetDefinition("APT", "Aptos", "APT-USD"),
+        AssetDefinition("ALGO", "Algorand", "ALGO-USD"),
+        AssetDefinition("MKR", "Maker", "MKR-USD"),
+        AssetDefinition("GRT", "The Graph", "GRT-USD"),
+        AssetDefinition("LDO", "Lido DAO", "LDO-USD"),
+        AssetDefinition("PEPE", "Pepe", "PEPE-USD"),
+        AssetDefinition("BONK", "Bonk", "BONK-USD"),
+        AssetDefinition("WIF", "dogwifhat", "WIF-USD"),
+        AssetDefinition("SEI", "Sei", "SEI-USD"),
+        AssetDefinition("RENDER", "Render", "RENDER-USD"),
+        AssetDefinition("IMX", "Immutable", "IMX-USD"),
+        AssetDefinition("MANA", "Decentraland", "MANA-USD"),
     )
 }
 

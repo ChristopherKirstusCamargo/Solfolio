@@ -13,8 +13,8 @@ android {
         applicationId = "dev.zhar.assetbackedcurrencies"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.6.3"
+        versionCode = 10
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -83,8 +83,6 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.android.billingclient:billing:9.1.0")
-
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

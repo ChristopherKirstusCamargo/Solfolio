@@ -2,8 +2,7 @@ package dev.zhar.abc.data.market
 
 import dev.zhar.abc.data.SettingsStore
 import dev.zhar.abc.domain.AppSettings
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import dev.zhar.abc.domain.DisplayCurrency
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,28 +18,24 @@ class FxRateService(
     suspend fun refreshIfNeeded(settings: AppSettings) {
         val sixHours = TimeUnit.HOURS.toMillis(6)
         if (System.currentTimeMillis() - settings.fxUpdatedAt < sixHours) return
-        val rate = fetchLatestBrlPerUsd() ?: return
-        if (rate in 2.0..10.0) settingsStore.updateFxRate(rate)
+        val rates = fetchLatestRates()
+        if (rates.size >= 10) settingsStore.updateFxRates(rates)
     }
 
-    private suspend fun fetchLatestBrlPerUsd(): Double? = withContext(Dispatchers.IO) {
+    private suspend fun fetchLatestRates(): Map<DisplayCurrency, Double> = withContext(Dispatchers.IO) {
         runCatching {
-            val formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy")
-            val end = LocalDate.now().format(formatter)
-            val start = LocalDate.now().minusDays(10).format(formatter)
-            val query = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/" +
-                "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)" +
-                "?@dataInicial='$start'&@dataFinalCotacao='$end'" +
-                "&%24orderby=dataHoraCotacao%20desc&%24top=1&%24format=json"
-            val request = Request.Builder().url(query).get().build()
+            val request = Request.Builder().url("https://api.coinbase.com/v2/exchange-rates?currency=USD")
+                .header("Accept", "application/json").header("User-Agent", "Solfolio/0.7.0").get().build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
-                val body = response.body?.string() ?: return@use null
-                val item = JSONObject(body).optJSONArray("value")?.optJSONObject(0) ?: return@use null
-                val buy = item.optDouble("cotacaoCompra", Double.NaN)
-                val sell = item.optDouble("cotacaoVenda", Double.NaN)
-                if (buy.isNaN() || sell.isNaN()) null else (buy + sell) / 2.0
+                if (!response.isSuccessful) return@use emptyMap()
+                val rates = JSONObject(response.body?.string().orEmpty()).optJSONObject("data")?.optJSONObject("rates") ?: return@use emptyMap()
+                buildMap {
+                    DisplayCurrency.entries.forEach { currency ->
+                        val rate = if (currency == DisplayCurrency.USD) 1.0 else rates.optString(currency.currencyCode).toDoubleOrNull()
+                        if (rate != null && rate.isFinite() && rate > 0.0) put(currency, rate)
+                    }
+                }
             }
-        }.getOrNull()
+        }.getOrDefault(emptyMap())
     }
 }

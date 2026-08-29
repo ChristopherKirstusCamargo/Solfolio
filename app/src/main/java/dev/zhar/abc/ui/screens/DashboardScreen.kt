@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,12 +29,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.zhar.abc.domain.AppSettings
 import dev.zhar.abc.domain.FeedStatus
 import dev.zhar.abc.domain.Holding
@@ -63,8 +71,11 @@ fun DashboardScreen(
     feedStatus: FeedStatus,
     onSelectPortfolio: (Long?) -> Unit,
     onAddEntry: () -> Unit,
+    onDeleteManualPosition: (Long, String, (Result<Unit>) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var deleteHolding by remember { mutableStateOf<Holding?>(null) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(
@@ -168,6 +179,9 @@ fun DashboardScreen(
                     holding = holding,
                     settings = settings,
                     hidden = settings.hideBalances,
+                    onDelete = holding.sourceKey.removePrefix("manual:").toLongOrNull()?.let { portfolioId ->
+                        { deleteHolding = holding; deleteError = null }
+                    },
                 )
             }
         } else {
@@ -184,6 +198,16 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+    deleteHolding?.let { holding ->
+        val portfolioId = holding.sourceKey.removePrefix("manual:").toLongOrNull()
+        AlertDialog(
+            onDismissRequest = { deleteHolding = null },
+            title = { Text("Remover ${holding.symbol}?") },
+            text = { Column { Text("Todos os lançamentos manuais desta posição serão excluídos deste portfólio."); deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) } } },
+            confirmButton = { TextButton(onClick = { if (portfolioId != null) onDeleteManualPosition(portfolioId, holding.symbol) { result -> result.onSuccess { deleteHolding = null }.onFailure { deleteError = it.message ?: "Não foi possível remover." } } }) { Text("Remover", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { deleteHolding = null }) { Text("Cancelar") } },
+        )
     }
 }
 
@@ -207,7 +231,8 @@ private fun MetricCard(
             Spacer(Modifier.height(7.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = when { value.length <= 15 -> 18.sp; value.length <= 20 -> 15.sp; else -> 12.sp },
                 color = valueColor,
                 maxLines = 1,
             )
@@ -220,6 +245,7 @@ private fun AssetHoldingRow(
     holding: Holding,
     settings: AppSettings,
     hidden: Boolean,
+    onDelete: (() -> Unit)? = null,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -267,7 +293,7 @@ private fun AssetHoldingRow(
                     transitionSpec = { fadeIn() togetherWith fadeOut() using SizeTransform(clip = false) },
                     label = "asset-value",
                 ) { value ->
-                    Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Text(value, fontSize = when { value.length <= 15 -> 18.sp; value.length <= 20 -> 15.sp; else -> 12.sp }, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
                 Spacer(Modifier.height(4.dp))
                 val changeColor = when {
@@ -280,6 +306,9 @@ private fun AssetHoldingRow(
                     color = changeColor,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, "Remover ${holding.symbol}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }

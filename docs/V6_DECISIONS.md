@@ -13,7 +13,7 @@ A V6 continua sobre a aplicação V5, o mesmo `applicationId`, o mesmo banco e a
 | Custo por endereço/ativo | Room | Usado para aumentar a cobertura e a precisão do P/L |
 | Histórico diário | Room | Um ponto por portfólio/dia; retenção de 370 dias |
 | Preferências | DataStore | Tema, paleta, moeda, privacidade e navegação |
-| Cotações | Cache privado temporário | Máximo de 50 ativos; pode ser descartado sem perder o portfólio |
+| Cotações | Cache privado temporário | Máximo de 80 ativos; pode ser descartado sem perder o portfólio |
 | Backup | Arquivo escolhido pelo usuário | AES-256-GCM, PBKDF2-HMAC-SHA256 e senha local |
 
 A migração Room `2 → 3` remove a unicidade global do endereço e cria a regra `(portfolioId, network, address)`. Assim, posições não são fundidas entre carteiras e o mesmo endereço pode ser acompanhado em mais de um portfólio quando essa for a escolha do usuário.
@@ -24,7 +24,7 @@ A migração Room `2 → 3` remove a unicidade global do endereço e cria a regr
 - Uma venda maior que a quantidade manual disponível é rejeitada antes de ser persistida.
 - Endereços podem receber custo total ou custo específico por ativo. Custos específicos têm prioridade; o restante é distribuído proporcionalmente apenas entre os ativos sem custo informado.
 - O gráfico principal usa snapshots do patrimônio completo. Enquanto o histórico diário ainda está sendo construído, a curva curta agrega os movimentos recentes de todas as posições.
-- A análise PRO é determinística e local. Utiliza concentração HHI, quantidade efetiva de ativos, cobertura de preço/custo, exposição principal e volatilidade histórica quando há pelo menos sete pontos.
+- A análise detalhada é determinística, gratuita e local. Utiliza concentração HHI, quantidade efetiva de ativos, cobertura de preço/custo, exposição principal e volatilidade histórica quando há pelo menos sete pontos.
 - Toda nota possui explicações. Os textos descrevem os dados e não fazem promessa ou recomendação financeira.
 
 ## Performance
@@ -32,14 +32,14 @@ A migração Room `2 → 3` remove a unicidade global do endereço e cria a regr
 - Um único `OkHttpClient` é compartilhado entre serviços.
 - A tela usa imediatamente os dados locais e atualiza rede em segundo plano.
 - A atualização de endereço só substitui o saldo persistido depois de uma resposta bem-sucedida.
-- No máximo três endereços são sincronizados ao mesmo tempo.
+- No máximo quatro endereços são sincronizados ao mesmo tempo.
 - Estado e rolagem de cada destino são preservados.
 - Cálculos intermediários agrupam operações e endereços uma vez por emissão, evitando filtros repetidos.
 - Animações de navegação são curtas e usam transformações leves.
 
 ## Serviços externos e custo
 
-A cotação usa o WebSocket público do Coinbase Advanced Trade, com uma única conexão ativa apenas enquanto o aplicativo está em primeiro plano. A documentação pública informa limite de oito conexões ou mensagens não autenticadas por segundo/IP; o fluxo atual fica muito abaixo disso. As condições de Market Data podem mudar e devem ser revistas novamente antes de cada publicação comercial. Se a distribuição de dados ou o modelo PRO exigir licença específica, o provedor deve ser trocado ou contratado antes do lançamento — a disponibilidade pública do endpoint, sozinha, não equivale a uma licença comercial irrestrita.
+A cotação usa o WebSocket público do Coinbase Advanced Trade, com uma única conexão ativa apenas enquanto o aplicativo está em primeiro plano. Uma consulta REST por minuto preenche ativos sem ticker recebido. As condições de Market Data podem mudar e devem ser revistas antes de cada publicação ampla.
 
 ## Segurança e privacidade
 
@@ -47,12 +47,11 @@ A cotação usa o WebSocket público do Coinbase Advanced Trade, com uma única 
 - `allowBackup=false`, tráfego HTTP aberto bloqueado e armazenamento privado foram preservados.
 - `FLAG_SECURE` é opcional para impedir captura e prévia no seletor de aplicativos.
 - O backup autentica o conteúdo com AES-GCM, limita tamanho e quantidade de registros e valida todas as referências antes da transação de restauração.
-- Biometria e direito PRO não são importados de um backup.
-- O PRO usa Google Play Billing. A validação local preserva o uso offline, mas não oferece a mesma resistência a adulteração de uma validação em servidor.
+- A biometria não é importada de um backup.
 
-## Produto FREE/PRO
+## Produto gratuito
 
-O FREE não foi artificialmente piorado: mantém tracker, preços, P/L, mercado, gráficos básicos, privacidade e uso offline. O PRO adiciona análise aprofundada e backup protegido. A compra planejada é única; o valor final exibido deve ser configurado no Google Play Console para o produto `solfolio_pro_lifetime`.
+Tracker, preços, P/L, mercado, análise detalhada, backup protegido, privacidade e uso offline estão disponíveis para todos. Doações são opcionais e não liberam funções.
 
 ## Testes obrigatórios antes da publicação
 
@@ -67,7 +66,7 @@ O FREE não foi artificialmente piorado: mantém tracker, preços, P/L, mercado,
 | Backup válido | Restauração atômica e referências preservadas |
 | Um ativo | Métricas sem divisão inválida |
 | Muitos ativos/operações | Rolagem e navegação responsivas |
-| Compra pendente/cancelada | PRO não é liberado indevidamente |
+| Preço de compra vazio | Posição permanece visível sem inventar P/L |
 
 ## Itens deliberadamente não adicionados
 

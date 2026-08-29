@@ -110,6 +110,19 @@ class PortfolioCalculatorTest {
         assertEquals(0.0, result.dataCoveragePercent, 0.00001)
     }
 
+    @Test
+    fun `blank purchase price keeps position without inventing profit`() {
+        val result = PortfolioCalculator.calculate(
+            entries = listOf(buy(1, "SOL", 2.0, 0.0)),
+            quotes = mapOf("SOL" to AssetQuote("SOL", 20.0)),
+        )
+
+        assertEquals(40.0, result.totalValueUsd, 0.00001)
+        assertEquals(0.0, result.unrealizedPnlUsd, 0.00001)
+        assertEquals(0.0, result.pnlCoveragePercent, 0.00001)
+        assertTrue(result.pnlIsEstimated)
+    }
+
     private fun buy(id: Long, symbol: String, quantity: Double, price: Double) = LedgerEntry(
         id = id,
         portfolioId = 1,

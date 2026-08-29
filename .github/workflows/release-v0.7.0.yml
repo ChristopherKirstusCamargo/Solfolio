@@ -1,4 +1,4 @@
-name: Build and publish Solfolio v0.6.3
+name: Build and publish Solfolio v0.7.0
 
 on:
   push:
@@ -28,16 +28,16 @@ jobs:
           ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
       - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Solfolio-v0.6.3-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Solfolio-v0.7.0-debug.apk
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.6.3 >/dev/null 2>&1; then
-            gh release upload v0.6.3 Solfolio-v0.6.3-debug.apk --clobber
+          if gh release view v0.7.0 >/dev/null 2>&1; then
+            gh release upload v0.7.0 Solfolio-v0.7.0-debug.apk --clobber
           else
-            gh release create v0.6.3 Solfolio-v0.6.3-debug.apk \
-              --title "Solfolio v0.6.3" \
-              --notes "Hotfix de carteiras de doação e base V6 do Solfolio. APK de depuração para instalação e testes."
+            gh release create v0.7.0 Solfolio-v0.7.0-debug.apk \
+              --title "Solfolio v0.7.0" \
+              --notes "Atualização gratuita: gráfico interativo, backup liberado, mais moedas e fiats, remoção de posições, navegação fluida e correções de desempenho. APK de depuração para instalação e testes."
           fi

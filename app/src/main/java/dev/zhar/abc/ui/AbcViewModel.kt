@@ -1,7 +1,6 @@
 package dev.zhar.abc.ui
 
 import android.app.Application
-import android.app.Activity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -50,7 +49,6 @@ data class AbcUiState(
     val settings: AppSettings = AppSettings(),
     val feedStatus: FeedStatus = FeedStatus.OFFLINE,
     val history: List<PortfolioHistoryPoint> = emptyList(),
-    val proStatus: ProStatus = ProStatus(),
     val isReady: Boolean = false,
 )
 private data class WalletData(val wallets: List<TrackedWalletEntity>, val assets: List<TrackedWalletAssetEntity>)
@@ -68,7 +66,7 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
     private val syncingWallets = MutableStateFlow<Set<Long>>(emptySet())
     private val walletErrors = MutableStateFlow<Map<Long, String>>(emptyMap())
     private var snapshotJob: Job? = null
-    private val walletSyncSlots = Semaphore(3)
+    private val walletSyncSlots = Semaphore(4)
     private val supportedMarketSymbols = AssetCatalog.defaults.map { it.symbol }.toSet()
     private val walletData = combine(repository.trackedWallets, repository.trackedWalletAssets) { wallets, assets -> WalletData(wallets, assets) }
     private val coreData = combine(repository.portfolios, repository.ledger, repository.assets, market.quotes, walletData) { p, l, a, q, w -> CoreData(p, l, a, q, w) }
@@ -82,8 +80,7 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
         selectionData,
         market.status,
         combine(syncingWallets, walletErrors) { syncing, errors -> syncing to errors },
-        app.proBillingManager.status,
-    ) { core, selection, status, walletStatus, proStatus ->
+    ) { core, selection, status, walletStatus ->
         val selectedId = selection.portfolioId
         val settings = selection.settings
         val history = selection.history
@@ -119,12 +116,11 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
             settings = settings,
             feedStatus = status,
             history = history,
-            proStatus = proStatus.copy(owned = proStatus.owned || settings.proEntitled),
             // Room has emitted the persisted state. Defaults can continue seeding without
             // trapping the whole interface behind an indefinite loading screen.
             isReady = true,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AbcUiState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AbcUiState())
 
     init {
         viewModelScope.launch {
@@ -197,10 +193,9 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startLiveUpdates() {
         market.start()
-        app.proBillingManager.start()
         viewModelScope.launch { fxRateService.refreshIfNeeded(settingsStore.settings.first()) }
         viewModelScope.launch {
-            delay(750)
+            delay(120)
             val now = System.currentTimeMillis()
             uiState.value.trackedWallets.filter { !it.syncing && now - it.lastSyncAt > 60_000 }.forEach { refreshTrackedWallet(it.id) }
         }
@@ -216,7 +211,6 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun stopLiveUpdates() {
         market.stop()
-        app.proBillingManager.stop()
         snapshotJob?.cancel()
         snapshotJob = null
     }
@@ -290,6 +284,9 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
         onResult(runCatching { app.historicalPriceService.fetch(productId, days) })
     }
     fun deleteTrackedWallet(id: Long) = viewModelScope.launch { repository.deleteTrackedWallet(id) }
+    fun deleteManualPosition(portfolioId: Long, symbol: String, onResult: (Result<Unit>) -> Unit) = viewModelScope.launch {
+        onResult(runCatching { repository.deleteManualPosition(portfolioId, symbol) })
+    }
     fun updateTrackedWalletCost(id: Long, costUsd: Double?, onResult: (Result<Unit>) -> Unit) = viewModelScope.launch { onResult(runCatching { repository.updateTrackedWalletCost(id, costUsd) }) }
     fun updateTrackedWalletAssetCost(walletId: Long, mint: String, costUsd: Double?, onResult: (Result<Unit>) -> Unit) = viewModelScope.launch {
         onResult(runCatching { repository.updateTrackedWalletAssetCost(walletId, mint, costUsd) })
@@ -298,8 +295,9 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
     fun saveEntry(draft: LedgerEntryDraft, onResult: (Result<Long>) -> Unit) = viewModelScope.launch {
         onResult(runCatching {
             require(draft.portfolioId > 0) { "Escolha uma carteira." }
-            require(draft.quantity > 0) { "A quantidade precisa ser maior que zero." }
-            require(draft.unitPriceUsd > 0) { "Informe um valor válido." }
+            require(draft.quantity.isFinite() && draft.quantity > 0) { "A quantidade precisa ser maior que zero." }
+            require(draft.unitPriceUsd.isFinite() && draft.unitPriceUsd >= 0) { "Informe um valor válido." }
+            require(draft.feeUsd.isFinite() && draft.feeUsd >= 0) { "Informe uma taxa válida." }
             require(draft.asset.symbol.isNotBlank()) { "Informe o ativo." }
             repository.addLedgerEntry(draft)
         })
@@ -312,8 +310,7 @@ class AbcViewModel(application: Application) : AndroidViewModel(application) {
     fun setHideBalances(v: Boolean) = viewModelScope.launch { settingsStore.setHideBalances(v) }
     fun setBiometricLock(v: Boolean) = viewModelScope.launch { settingsStore.setBiometricLock(v) }
     fun setSecureScreen(v: Boolean) = viewModelScope.launch { settingsStore.setSecureScreen(v) }
-    fun setInteractionFeedback(v: Boolean) = viewModelScope.launch { settingsStore.setInteractionFeedback(v) }
-    fun purchasePro(activity: Activity) = app.proBillingManager.purchase(activity)
+    fun setLockTimeout(v: LockTimeout) = viewModelScope.launch { settingsStore.setLockTimeout(v) }
     fun createBackup(password: CharArray, onResult: (Result<ByteArray>) -> Unit) = viewModelScope.launch {
         try {
             onResult(runCatching { backupManager.create(password) })

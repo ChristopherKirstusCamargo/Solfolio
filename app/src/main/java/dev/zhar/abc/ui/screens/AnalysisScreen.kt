@@ -61,7 +61,6 @@ fun AnalysisScreen(
     portfolioName: String,
     snapshot: PortfolioSnapshot,
     history: List<PortfolioHistoryPoint>,
-    proOwned: Boolean,
     settings: AppSettings,
     onAddEntry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -91,7 +90,7 @@ fun AnalysisScreen(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = mode == AnalysisMode.SUMMARY, onClick = { mode = AnalysisMode.SUMMARY }, label = { Text("Resumo") }, modifier = Modifier.weight(1f))
-                FilterChip(selected = mode == AnalysisMode.ADVANCED, onClick = { mode = AnalysisMode.ADVANCED }, label = { Text("Análise PRO") }, modifier = Modifier.weight(1f))
+                FilterChip(selected = mode == AnalysisMode.ADVANCED, onClick = { mode = AnalysisMode.ADVANCED }, label = { Text("Detalhada") }, modifier = Modifier.weight(1f))
             }
         }
 
@@ -102,28 +101,18 @@ fun AnalysisScreen(
                     message = "Adicione uma posição para começar.",
                 )
             }
-        } else if (mode == AnalysisMode.ADVANCED && !proOwned) {
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text("Análise de Portfólio PRO", style = MaterialTheme.typography.titleLarge)
-                        Text("Entenda diversificação, concentração, risco, qualidade dos dados e volatilidade com explicações claras.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Ative o PRO em Ajustes. Compra única, sem assinatura.", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
         } else if (mode == AnalysisMode.ADVANCED) {
             item { AdvancedScoreCard(advanced) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ScoreMetricCard("Diversificação", advanced.diversificationScore, scoreLabel(advanced.diversificationScore), "Distribuição efetiva", Modifier.weight(1f))
-                    ScoreMetricCard("Concentração", advanced.concentrationScore, scoreLabel(advanced.concentrationScore), "100 = mais distribuída", Modifier.weight(1f))
+                    ScoreMetricCard("Diversificação", advanced.diversificationScore, scoreLabel(advanced.diversificationScore), "Equilíbrio entre ativos", Modifier.weight(1f))
+                    ScoreMetricCard("Distribuição", advanced.concentrationScore, scoreLabel(advanced.concentrationScore), "Maior é mais equilibrado", Modifier.weight(1f))
                 }
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ScoreMetricCard("Risco", advanced.riskScore, riskLabel(advanced.riskScore), "100 = maior risco", Modifier.weight(1f))
-                    ScoreMetricCard("Dados", advanced.dataQualityScore, scoreLabel(advanced.dataQualityScore), "Cotação + custo", Modifier.weight(1f))
+                    ScoreMetricCard("Risco", advanced.riskScore, riskLabel(advanced.riskScore), "Maior exige mais atenção", Modifier.weight(1f))
+                    ScoreMetricCard("Precisão", advanced.dataQualityScore, scoreLabel(advanced.dataQualityScore), "Preços e custos conhecidos", Modifier.weight(1f))
                 }
             }
             item { Text("Por que essa nota existe?", style = MaterialTheme.typography.titleLarge) }
@@ -150,7 +139,7 @@ fun AnalysisScreen(
                         title = "Risco",
                         score = snapshot.riskScore,
                         label = snapshot.riskLabel,
-                        supporting = "100 = maior risco",
+                        supporting = "Exposição da carteira",
                         modifier = Modifier.weight(1f),
                     )
                     ScoreMetricCard(
@@ -230,7 +219,7 @@ private fun AdvancedScoreCard(analysis: AdvancedPortfolioAnalysis) {
             Column(Modifier.weight(1f)) {
                 Text("Nota geral", style = MaterialTheme.typography.titleLarge)
                 Text("${scoreLabel(analysis.overallScore)} · ${"%.1f".format(analysis.effectiveAssetCount)} ativos efetivos", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Top 3: ${formatPercent(analysis.topThreePercent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Três maiores posições: ${"%.1f".format(analysis.topThreePercent)}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -260,7 +249,8 @@ private fun PerformanceOverviewCard(snapshot: PortfolioSnapshot, settings: AppSe
 }
 
 @Composable private fun SummaryValue(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f)); Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1) }
+    val style = if (value.length > 16) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium
+    Column(modifier) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f)); Text(value, style = style, maxLines = 1) }
 }
 
 @Composable

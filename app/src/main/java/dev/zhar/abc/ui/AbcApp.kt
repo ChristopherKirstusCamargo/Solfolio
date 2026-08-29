@@ -1,6 +1,5 @@
 package dev.zhar.abc.ui
 
-import android.view.SoundEffectConstants
 import android.view.WindowManager
 import android.app.Activity
 import androidx.compose.animation.AnimatedContent
@@ -10,22 +9,24 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
@@ -57,9 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
@@ -115,7 +113,7 @@ fun AbcAppRoot(
                     if (
                         state.settings.biometricLock &&
                         backgroundedAt > 0L &&
-                        System.currentTimeMillis() - backgroundedAt > 15_000L
+                        System.currentTimeMillis() - backgroundedAt >= state.settings.lockTimeout.timeoutMs
                     ) {
                         unlocked = false
                     }
@@ -190,15 +188,9 @@ private fun AbcApp(
                 .getOrDefault(AppDestination.HOME),
         )
     }
-    val view = LocalView.current
-    val haptic = LocalHapticFeedback.current
     val screenStateHolder = rememberSaveableStateHolder()
     val selectDestination: (AppDestination) -> Unit = { next ->
         if (destination != next) {
-            if (state.settings.interactionFeedback) {
-                view.playSoundEffect(SoundEffectConstants.CLICK)
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            }
             destination = next
             viewModel.setLastDestination(next.name)
         }
@@ -207,39 +199,25 @@ private fun AbcApp(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
+            val navigationItems = AppDestination.entries.filter { it.showInNavigation }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                AppDestination.entries.filter { it.showInNavigation }.forEach { item ->
-                    val selected = destination == item
-                    val pillWidth by animateDpAsState(if (selected) 58.dp else 40.dp, tween(220), label = "pill-width")
-                    val pillElevation by animateDpAsState(if (selected) 4.dp else 0.dp, tween(220), label = "pill-elevation")
-                    val iconScale by animateFloatAsState(if (selected) 1.08f else 1f, tween(220), label = "icon-scale")
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { selectDestination(item) },
-                        icon = {
-                            Box(
-                                modifier = Modifier
-                                    .width(pillWidth)
-                                    .height(if (item == AppDestination.MARKET) 40.dp else 36.dp)
-                                    .shadow(pillElevation, RoundedCornerShape(20.dp))
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                                        RoundedCornerShape(20.dp),
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    item.icon,
-                                    contentDescription = item.label,
-                                    modifier = Modifier
-                                        .size(if (item == AppDestination.MARKET) 29.dp else 24.dp)
-                                        .graphicsLayer { scaleX = iconScale; scaleY = iconScale },
-                                )
-                            }
-                        },
-                        label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
-                    )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val itemWidth = maxWidth / navigationItems.size
+                    val selectedIndex = navigationItems.indexOf(destination).coerceAtLeast(0)
+                    val indicatorOffset by animateDpAsState(itemWidth * selectedIndex + (itemWidth - 50.dp) / 2, tween(280), label = "nav-indicator")
+                    Box(Modifier.offset(x = indicatorOffset, y = 7.dp).width(50.dp).height(38.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(19.dp)))
+                    Row(Modifier.fillMaxWidth()) {
+                        navigationItems.forEach { item ->
+                            NavigationBarItem(
+                                selected = destination == item,
+                                onClick = { selectDestination(item) },
+                                icon = { Icon(item.icon, item.label, Modifier.size(if (item == AppDestination.MARKET) 28.dp else 24.dp)) },
+                                label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -270,6 +248,7 @@ private fun AbcApp(
                 feedStatus = state.feedStatus,
                 onSelectPortfolio = viewModel::selectPortfolio,
                 onAddEntry = { selectDestination(AppDestination.ADD) },
+                onDeleteManualPosition = viewModel::deleteManualPosition,
                 modifier = screenModifier,
             )
 
@@ -319,7 +298,6 @@ private fun AbcApp(
                 portfolioName = state.selectedPortfolioName,
                 snapshot = state.snapshot,
                 history = state.history,
-                proOwned = state.proStatus.owned,
                 settings = state.settings,
                 onAddEntry = { selectDestination(AppDestination.ADD) },
                 modifier = screenModifier,
@@ -328,7 +306,6 @@ private fun AbcApp(
             AppDestination.SETTINGS -> SettingsScreen(
                 settings = state.settings,
                 feedStatus = state.feedStatus,
-                proStatus = state.proStatus,
                 biometricAvailable = biometricAvailable,
                 onThemeChange = viewModel::setTheme,
                 onPaletteChange = viewModel::setColorPalette,
@@ -337,8 +314,7 @@ private fun AbcApp(
                 onHideBalancesChange = viewModel::setHideBalances,
                 onBiometricChange = viewModel::setBiometricLock,
                 onSecureScreenChange = viewModel::setSecureScreen,
-                onInteractionFeedbackChange = viewModel::setInteractionFeedback,
-                onPurchasePro = { (view.context as? Activity)?.let(viewModel::purchasePro) },
+                onLockTimeoutChange = viewModel::setLockTimeout,
                 onCreateBackup = viewModel::createBackup,
                 onRestoreBackup = viewModel::restoreBackup,
                 modifier = screenModifier,

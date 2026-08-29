@@ -23,7 +23,7 @@ class BackupManager(private val dao: AbcDao, private val settingsStore: Settings
             .put("format", "solfolio-backup")
             .put("schema", 1)
             .put("createdAt", System.currentTimeMillis())
-            .put("settings", JSONObject().put("theme", settings.theme.name).put("currency", settings.displayCurrency.name).put("hideBalances", settings.hideBalances).put("palette", settings.colorPalette.name).put("refresh", settings.priceRefreshSpeed.name).put("secureScreen", settings.secureScreen).put("interactionFeedback", settings.interactionFeedback))
+            .put("settings", JSONObject().put("theme", settings.theme.name).put("currency", settings.displayCurrency.name).put("hideBalances", settings.hideBalances).put("palette", settings.colorPalette.name).put("refresh", settings.priceRefreshSpeed.name).put("secureScreen", settings.secureScreen).put("lockTimeout", settings.lockTimeout.name))
             .put("portfolios", JSONArray().apply { dao.exportPortfolios().forEach { put(it.toJson()) } })
             .put("assets", JSONArray().apply { dao.exportAssets().forEach { put(it.toJson()) } })
             .put("ledger", JSONArray().apply { dao.exportLedger().forEach { put(it.toJson()) } })
@@ -57,7 +57,7 @@ class BackupManager(private val dao: AbcDao, private val settingsStore: Settings
         val walletIds = wallets.map { it.id }.toSet()
         require(portfolioIds.size == portfolios.size && walletIds.size == wallets.size && symbols.size == assets.size) { "O backup contém identificadores duplicados." }
         require(ledger.all { it.portfolioId in portfolioIds && it.symbol in symbols }) { "Há operações com vínculos inválidos." }
-        require(ledger.all { it.quantity > 0.0 && it.unitPriceUsd > 0.0 && it.feeUsd >= 0.0 }) { "Há operações com valores inválidos." }
+        require(ledger.all { it.quantity.isFinite() && it.quantity > 0.0 && it.unitPriceUsd.isFinite() && it.unitPriceUsd >= 0.0 && it.feeUsd.isFinite() && it.feeUsd >= 0.0 }) { "Há operações com valores inválidos." }
         require(wallets.all { it.portfolioId in portfolioIds }) { "Há endereços com portfólio inválido." }
         require(walletAssets.all { it.walletId in walletIds }) { "Há ativos com endereço inválido." }
         require(walletAssets.all { it.quantity >= 0.0 && (it.costBasisUsd ?: 0.0) >= 0.0 }) { "Há saldos ou custos inválidos." }
@@ -72,7 +72,7 @@ class BackupManager(private val dao: AbcDao, private val settingsStore: Settings
                 colorPalette = saved.enum("palette", current.colorPalette),
                 priceRefreshSpeed = saved.enum("refresh", current.priceRefreshSpeed),
                 secureScreen = saved.optBoolean("secureScreen", current.secureScreen),
-                interactionFeedback = saved.optBoolean("interactionFeedback", current.interactionFeedback),
+                lockTimeout = saved.enum("lockTimeout", current.lockTimeout),
             ))
         }
         BackupSummary(portfolios.size, ledger.size, wallets.size, root.getLong("createdAt"))

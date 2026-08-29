@@ -57,6 +57,7 @@ import dev.zhar.abc.ui.PortfolioView
 import dev.zhar.abc.ui.components.AssetAvatar
 import dev.zhar.abc.ui.theme.SolfolioLayout
 import dev.zhar.abc.util.formatMoneyDirect
+import dev.zhar.abc.util.ratePerUsd
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
@@ -83,6 +84,7 @@ fun AddTransactionScreen(
     var moreAssetsMenu by remember { mutableStateOf(false) }
     var kind by rememberSaveable { mutableStateOf(TransactionKind.BUY) }
     var entryCurrency by rememberSaveable { mutableStateOf(settings.displayCurrency) }
+    var currencyMenu by remember { mutableStateOf(false) }
     var quantityText by rememberSaveable { mutableStateOf("") }
     var amountText by rememberSaveable { mutableStateOf("") }
     var feeText by rememberSaveable { mutableStateOf("") }
@@ -235,7 +237,7 @@ fun AddTransactionScreen(
                     Text(
                         text = activeQuote?.let {
                             formatMoneyDirect(
-                                if (entryCurrency == DisplayCurrency.BRL) it.priceUsd * settings.brlPerUsd else it.priceUsd,
+                                it.priceUsd * ratePerUsd(settings, entryCurrency),
                                 entryCurrency,
                             )
                         } ?: "Sem cotação",
@@ -265,13 +267,12 @@ fun AddTransactionScreen(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DisplayCurrency.entries.forEach { currency ->
-                FilterChip(
-                    selected = entryCurrency == currency,
-                    onClick = { entryCurrency = currency },
-                    label = { Text(currency.name) },
-                )
+        Box {
+            OutlinedButton(onClick = { currencyMenu = true }) {
+                Text("Moeda: ${entryCurrency.currencyCode}"); Spacer(Modifier.size(6.dp)); Icon(Icons.Rounded.ExpandMore, null)
+            }
+            DropdownMenu(expanded = currencyMenu, onDismissRequest = { currencyMenu = false }) {
+                DisplayCurrency.entries.forEach { currency -> DropdownMenuItem(text = { Text(currency.currencyCode) }, trailingIcon = if (currency == entryCurrency) ({ Icon(Icons.Rounded.Check, null) }) else null, onClick = { entryCurrency = currency; currencyMenu = false }) }
             }
         }
 
@@ -289,8 +290,9 @@ fun AddTransactionScreen(
             value = amountText,
             onValueChange = { amountText = sanitizeDecimal(it) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (kind == TransactionKind.BUY) "Total pago" else "Total recebido") },
-            prefix = { Text(if (entryCurrency == DisplayCurrency.BRL) "R$ " else "\$ ") },
+            label = { Text(if (kind == TransactionKind.BUY) "Total pago (opcional)" else "Total recebido (opcional)") },
+            placeholder = { Text("Deixe vazio se não souber") },
+            prefix = { Text("${entryCurrency.currencyCode} ") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
         )
@@ -300,7 +302,7 @@ fun AddTransactionScreen(
                     val quantity = parseDecimal(quantityText) ?: 0.0
                     if (quantity > 0.0) {
                         val total = quantity * activeQuote.priceUsd *
-                            if (entryCurrency == DisplayCurrency.BRL) settings.brlPerUsd else 1.0
+                            ratePerUsd(settings, entryCurrency)
                         amountText = decimalForInput(total)
                     } else {
                         error = "Informe primeiro a quantidade."
@@ -317,7 +319,7 @@ fun AddTransactionScreen(
             onValueChange = { feeText = sanitizeDecimal(it) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Taxa (opcional)") },
-            prefix = { Text(if (entryCurrency == DisplayCurrency.BRL) "R$ " else "\$ ") },
+            prefix = { Text("${entryCurrency.currencyCode} ") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
         )
@@ -341,23 +343,23 @@ fun AddTransactionScreen(
                 val asset = activeAsset
                 val portfolio = portfolioId
                 val quantity = parseDecimal(quantityText)
-                val amount = parseDecimal(amountText)
+                val amount = parseDecimal(amountText)?.takeIf { it > 0.0 } ?: 0.0
                 val fee = parseDecimal(feeText) ?: 0.0
                 when {
                     portfolio == null -> error = "Escolha um portfólio."
                     asset == null -> error = "Escolha um ativo."
                     quantity == null || quantity <= 0.0 -> error = "Informe uma quantidade válida."
-                    amount == null || amount <= 0.0 -> error = "Informe o valor total da operação."
                     else -> {
-                        val amountUsd = if (entryCurrency == DisplayCurrency.BRL) amount / settings.brlPerUsd else amount
-                        val feeUsd = if (entryCurrency == DisplayCurrency.BRL) fee / settings.brlPerUsd else fee
+                        val rate = ratePerUsd(settings, entryCurrency).takeIf { it > 0.0 } ?: 1.0
+                        val amountUsd = amount / rate
+                        val feeUsd = fee / rate
                         val draft = LedgerEntryDraft(
                             portfolioId = portfolio,
                             asset = asset,
                             isCustomAsset = customAsset != null,
                             kind = kind,
                             quantity = quantity,
-                            unitPriceUsd = amountUsd / quantity,
+                            unitPriceUsd = if (amountUsd > 0.0) amountUsd / quantity else 0.0,
                             feeUsd = feeUsd,
                             originalAmount = amount,
                             originalCurrency = entryCurrency.name,
@@ -492,7 +494,7 @@ private fun sanitizeDecimal(value: String): String = value
         }
     }
 
-private fun parseDecimal(value: String): Double? = value.replace(',', '.').toDoubleOrNull()
+private fun parseDecimal(value: String): Double? = value.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
 
 private fun decimalForInput(value: Double): String {
     val symbols = DecimalFormatSymbols(Locale("pt", "BR"))

@@ -45,7 +45,6 @@ import java.util.Locale
 fun SettingsScreen(
     settings: AppSettings,
     feedStatus: FeedStatus,
-    proStatus: ProStatus,
     biometricAvailable: Boolean,
     onThemeChange: (ThemePreference) -> Unit,
     onPaletteChange: (ColorPalette) -> Unit,
@@ -54,22 +53,27 @@ fun SettingsScreen(
     onHideBalancesChange: (Boolean) -> Unit,
     onBiometricChange: (Boolean) -> Unit,
     onSecureScreenChange: (Boolean) -> Unit,
-    onInteractionFeedbackChange: (Boolean) -> Unit,
-    onPurchasePro: () -> Unit,
+    onLockTimeoutChange: (LockTimeout) -> Unit,
     onCreateBackup: (CharArray, (Result<ByteArray>) -> Unit) -> Unit,
     onRestoreBackup: (ByteArray, CharArray, (Result<BackupSummary>) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var showDonate by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf(SettingsPage.MAIN) }
     var exportBytes by remember { mutableStateOf<ByteArray?>(null) }
     var importBytes by remember { mutableStateOf<ByteArray?>(null) }
     var showCreatePassword by remember { mutableStateOf(false) }
     var showRestorePassword by remember { mutableStateOf(false) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
-    if (showDonate) {
-        DonateScreen(modifier = modifier, onBack = { showDonate = false })
+    if (page != SettingsPage.MAIN) {
+        when (page) {
+            SettingsPage.DONATE -> DonateScreen(modifier = modifier, onBack = { page = SettingsPage.MAIN })
+            SettingsPage.PALETTE -> PaletteSettingsScreen(settings, onPaletteChange, modifier) { page = SettingsPage.MAIN }
+            SettingsPage.PRICES -> PriceSettingsScreen(settings, onPriceRefreshSpeedChange, modifier) { page = SettingsPage.MAIN }
+            SettingsPage.CURRENCY -> CurrencySettingsScreen(settings, onCurrencyChange, modifier) { page = SettingsPage.MAIN }
+            SettingsPage.MAIN -> Unit
+        }
         return
     }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -99,28 +103,6 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(SolfolioLayout.sectionSpacing),
     ) {
         item { Column { Text("Ajustes", style = MaterialTheme.typography.headlineMedium); Text("Aparência, moeda e privacidade.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.size(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Solfolio PRO", style = MaterialTheme.typography.titleLarge)
-                            Text("Análise e backup.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(if (proStatus.owned) "PRO ativado neste aparelho" else "Compra única · ${proStatus.formattedPrice}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    if (!proStatus.owned && proStatus.available) {
-                        FilledTonalButton(onClick = onPurchasePro, enabled = proStatus.available && !proStatus.pending, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (proStatus.pending) "Pagamento pendente" else "Desbloquear PRO")
-                        }
-                    } else if (!proStatus.owned) {
-                        Text("Compra em preparação", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
         item { SectionTitle("Aparência") }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -140,55 +122,28 @@ fun SettingsScreen(
                 }
             }
         }
-        item { Text("Paleta de cores", style = MaterialTheme.typography.titleMedium) }
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                items(ColorPalette.entries) { palette ->
-                    FilterChip(selected = settings.colorPalette == palette, onClick = { onPaletteChange(palette) }, label = { Text(paletteLabel(palette)) }, leadingIcon = { Box(Modifier.size(18.dp).background(paletteColor(palette), CircleShape)) })
-                }
-            }
-        }
-        item { Text("Escolha as cores do aplicativo.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { SettingsLinkCard(Icons.Rounded.Palette, "Paleta de cores", paletteLabel(settings.colorPalette)) { page = SettingsPage.PALETTE } }
         item { SectionTitle("Moeda") }
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.CurrencyExchange, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.size(11.dp)); Column { Text("Moeda de exibição", style = MaterialTheme.typography.titleMedium); Text("Veja os valores em real ou dólar.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { DisplayCurrency.entries.forEach { currency -> FilterChip(settings.displayCurrency == currency, { onCurrencyChange(currency) }, { Text(currency.name) }, Modifier.weight(1f)) } }
-                    Text("USD/BRL: ${String.format(Locale.ROOT, "%.4f", settings.brlPerUsd)}" + if (settings.fxUpdatedAt > 0) " · ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(settings.fxUpdatedAt))}" else " · valor temporário", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
+        item { SettingsLinkCard(Icons.Rounded.CurrencyExchange, "Moeda de exibição", settings.displayCurrency.currencyCode) { page = SettingsPage.CURRENCY } }
         item { SectionTitle("Cotações") }
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.size(11.dp))
-                        Column { Text("Atualização dos preços", style = MaterialTheme.typography.titleMedium); Text("Escolha com que frequência a tela muda.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(PriceRefreshSpeed.entries) { speed ->
-                            FilterChip(
-                                selected = settings.priceRefreshSpeed == speed,
-                                onClick = { onPriceRefreshSpeedChange(speed) },
-                                label = { Text(priceSpeedLabel(speed)) },
-                            )
-                        }
-                    }
-                    Text("Define a frequência visual dos preços reais.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
+        item { SettingsLinkCard(Icons.Rounded.Speed, "Atualização dos preços", priceSpeedLabel(settings.priceRefreshSpeed)) { page = SettingsPage.PRICES } }
         item { SectionTitle("Privacidade") }
         item { SettingSwitch(Icons.Rounded.RemoveRedEye, "Ocultar saldos", "Esconde valores e percentuais.", settings.hideBalances, onHideBalancesChange) }
         item { SettingSwitch(Icons.Rounded.Fingerprint, "Bloqueio biométrico", if (biometricAvailable) "Pede sua biometria ao abrir." else "Biometria forte não configurada.", settings.biometricLock, onBiometricChange, biometricAvailable) }
+        if (settings.biometricLock) item {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Bloquear depois de", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LockTimeout.entries.forEach { timeout -> FilterChip(settings.lockTimeout == timeout, { onLockTimeoutChange(timeout) }, { Text(lockTimeoutLabel(timeout)) }) }
+                    }
+                }
+            }
+        }
         item { SettingSwitch(Icons.Rounded.Screenshot, "Proteger tela", "Impede capturas e oculta a prévia em aplicativos recentes.", settings.secureScreen, onSecureScreenChange) }
-        item { SettingSwitch(Icons.Rounded.TouchApp, "Som e resposta tátil", "Confirma os toques na navegação.", settings.interactionFeedback, onInteractionFeedbackChange) }
         item { SectionTitle("Apoiar") }
         item {
-            Card(onClick = { showDonate = true }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Card(onClick = { page = SettingsPage.DONATE }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.VolunteerActivism, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(11.dp))
@@ -216,10 +171,9 @@ fun SettingsScreen(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DataRow(Icons.Rounded.Lock, "Backup protegido", "Salve ou restaure seus dados.")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { showCreatePassword = true }, enabled = proStatus.owned, modifier = Modifier.weight(1f)) { Text("Criar") }
-                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) }, enabled = proStatus.owned, modifier = Modifier.weight(1f)) { Text("Restaurar") }
+                        FilledTonalButton(onClick = { showCreatePassword = true }, modifier = Modifier.weight(1f)) { Text("Criar") }
+                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/octet-stream", "application/zip", "*/*")) }, modifier = Modifier.weight(1f)) { Text("Restaurar") }
                     }
-                    if (!proStatus.owned) Text("Disponível no PRO.", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     backupMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             }
@@ -255,6 +209,75 @@ fun SettingsScreen(
                 result.onSuccess { backupMessage = "${it.portfolios} portfólio(s) e ${it.operations} operação(ões) restaurados." }
                     .onFailure { backupMessage = it.message ?: "Senha incorreta ou backup inválido." }
                 importBytes = null
+            }
+        }
+    }
+}
+
+private enum class SettingsPage { MAIN, PALETTE, PRICES, CURRENCY, DONATE }
+
+@Composable
+private fun SettingsLinkCard(icon: ImageVector, title: String, value: String, onClick: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Icon(Icons.Rounded.ChevronRight, null)
+        }
+    }
+}
+
+@Composable
+private fun SettingsPageHeader(title: String, subtitle: String, onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, "Voltar") }
+        Column { Text(title, style = MaterialTheme.typography.headlineMedium); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@Composable
+private fun PaletteSettingsScreen(settings: AppSettings, onChange: (ColorPalette) -> Unit, modifier: Modifier, onBack: () -> Unit) {
+    LazyColumn(modifier, contentPadding = PaddingValues(SolfolioLayout.screenHorizontal, 14.dp, SolfolioLayout.screenHorizontal, SolfolioLayout.screenBottom), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { SettingsPageHeader("Paleta de cores", "Escolha a identidade visual.", onBack) }
+        items(ColorPalette.entries) { palette ->
+            Card(onClick = { onChange(palette) }, colors = CardDefaults.cardColors(containerColor = if (settings.colorPalette == palette) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(28.dp).background(paletteColor(palette), CircleShape)); Spacer(Modifier.width(12.dp)); Text(paletteLabel(palette), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    if (settings.colorPalette == palette) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PriceSettingsScreen(settings: AppSettings, onChange: (PriceRefreshSpeed) -> Unit, modifier: Modifier, onBack: () -> Unit) {
+    LazyColumn(modifier, contentPadding = PaddingValues(SolfolioLayout.screenHorizontal, 14.dp, SolfolioLayout.screenHorizontal, SolfolioLayout.screenBottom), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { SettingsPageHeader("Atualização dos preços", "Controle a frequência visual.", onBack) }
+        item { Text("Os preços vêm do mercado. Intervalos curtos deixam a tela mais ativa e podem gastar mais bateria.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        items(PriceRefreshSpeed.entries) { speed ->
+            Card(onClick = { onChange(speed) }, colors = CardDefaults.cardColors(containerColor = if (settings.priceRefreshSpeed == speed) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Schedule, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(12.dp)); Text(priceSpeedLabel(speed), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    if (settings.priceRefreshSpeed == speed) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrencySettingsScreen(settings: AppSettings, onChange: (DisplayCurrency) -> Unit, modifier: Modifier, onBack: () -> Unit) {
+    LazyColumn(modifier, contentPadding = PaddingValues(SolfolioLayout.screenHorizontal, 14.dp, SolfolioLayout.screenHorizontal, SolfolioLayout.screenBottom), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { SettingsPageHeader("Moeda de exibição", "Escolha entre ${DisplayCurrency.entries.size} moedas fiat.", onBack) }
+        item { Text(if (settings.fxUpdatedAt > 0) "Câmbio atualizado automaticamente." else "Usando taxas offline até a primeira atualização.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        items(DisplayCurrency.entries) { currency ->
+            Card(onClick = { onChange(currency) }, colors = CardDefaults.cardColors(containerColor = if (settings.displayCurrency == currency) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(currency.currencyCode, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    if (settings.displayCurrency == currency) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
@@ -393,6 +416,10 @@ private fun priceSpeedLabel(value: PriceRefreshSpeed) = when (value) {
     PriceRefreshSpeed.MEDIUM -> "Média · 15 s"
     PriceRefreshSpeed.HIGH -> "Alta · 5 s"
     PriceRefreshSpeed.INSTANT -> "Instantânea · <1 s"
+}
+
+private fun lockTimeoutLabel(value: LockTimeout) = when (value) {
+    LockTimeout.INSTANT -> "Imediatamente"; LockTimeout.ONE_MINUTE -> "1 minuto"; LockTimeout.FIVE_MINUTES -> "5 minutos"; LockTimeout.TEN_MINUTES -> "10 minutos"
 }
 
 private fun InputStream.readBackupBytes(): ByteArray {
