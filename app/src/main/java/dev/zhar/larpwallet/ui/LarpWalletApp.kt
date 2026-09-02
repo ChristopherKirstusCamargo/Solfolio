@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
@@ -43,6 +44,7 @@ import dev.zhar.larpwallet.ui.theme.MutedText
 import dev.zhar.larpwallet.ui.theme.PurpleBright
 import dev.zhar.larpwallet.ui.theme.SoftWhite
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LarpWalletApp(viewModel: WalletViewModel) {
     val state = viewModel.state
