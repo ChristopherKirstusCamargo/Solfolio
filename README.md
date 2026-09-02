@@ -1,30 +1,57 @@
-# Solfolio 0.7.0
+# LARP Wallet
 
-O Solfolio é somente leitura: não movimenta fundos e nunca solicita seed ou chave privada.
+Carteira cenográfica Android para protótipos, histórias, vídeos e demonstrações. A interface é inspirada na fluidez de carteiras modernas, mas usa identidade própria e mantém o aviso **SIMULAÇÃO • SEM VALOR REAL** visível no aplicativo.
 
-## Atualização 0.7.0
+## O que o aplicativo faz
 
-- Aplicativo gratuito.
-- Doações opcionais não liberam funções.
-- Backup e restauração criptografados disponíveis para todos.
-- Gráfico histórico interativo: toque ou deslize para consultar preço e data.
-- 40 criptoativos no catálogo e no mercado, com fallback de preços via Coinbase.
-- 26 moedas fiat de exibição com câmbio atualizado e taxas offline de contingência.
-- Posições manuais podem ser removidas; preço de compra pode ficar em branco.
-- Valores grandes se ajustam ao espaço sem quebrar a tela.
-- Análise local reorganizada, com explicações curtas e métricas mais legíveis.
-- Bloqueio biométrico configurável: imediato, 1, 5 ou 10 minutos.
-- Indicador inferior desliza entre as abas e o último destino continua salvo.
-- Dados locais aparecem antes da sincronização; preços e carteiras atualizam em segundo plano.
+- Permite definir qualquer saldo total.
+- Permite adicionar e editar ativos, quantidades, preços e variações de 24 horas.
+- Simula recebimentos, envios e trocas sem acessar blockchain.
+- Mantém um histórico fictício de atividades.
+- Permite criar colecionáveis cenográficos.
+- Exibe valores em BRL ou USD com cotação manual.
+- Salva todo o cenário localmente no aparelho.
+- Funciona sem conta e sem internet.
 
-## Distribuição
+## Limites deliberados
 
-O APK pode ser distribuído gratuitamente pela página de Releases deste repositório. Android poderá pedir ao usuário autorização para instalar aplicativos dessa fonte. Publique também o SHA-256 do arquivo em cada release e use assinatura de lançamento própria antes de distribuição ampla.
+- Não cria ou importa seed phrase.
+- Não armazena chaves privadas.
+- Não assina nem transmite transações.
+- Não consulta saldos, preços ou endereços reais.
+- O endereço mostrado na tela de recebimento é propositalmente inválido.
+- Não é afiliado à Phantom Technologies, Inc.
 
-## Segurança e privacidade
+O aplicativo não deve ser usado para alegar posse de ativos reais nem para produzir evidências financeiras falsas. O aviso de simulação é uma parte permanente da interface.
 
-- Aceita apenas endereços públicos e não possui código de assinatura ou envio de transações.
-- Dados permanentes ficam no banco privado do Android; tráfego HTTP sem TLS e backup automático do sistema estão desativados.
-- Backups exportados usam AES-256-GCM com chave derivada por PBKDF2.
-- Serviços de preço e RPC recebem os endereços públicos consultados.
-- Proteção de tela e biometria são opcionais.
+## Tecnologia
+
+- Kotlin 2.1.21
+- Jetpack Compose + Material 3
+- Android 8.0 ou superior (minSdk 26)
+- Persistência com `SharedPreferences` e JSON
+- Nenhuma permissão de rede
+
+## Compilar
+
+Use Java 17 e o Android SDK 35:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+O APK será criado em `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Estrutura
+
+- `model/Models.kt`: ativos, atividades, colecionáveis e estado da carteira.
+- `data/WalletRepository.kt`: persistência local.
+- `ui/WalletViewModel.kt`: regras das operações simuladas.
+- `ui/Screens.kt`: telas principais.
+- `ui/WalletSheets.kt`: edição e fluxos de ação.
+- `ui/Components.kt`: componentes visuais reutilizáveis.
+
+## Licença
+
+MIT. By Christopher.
+

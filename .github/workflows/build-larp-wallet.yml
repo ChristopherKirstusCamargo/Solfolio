@@ -1,0 +1,63 @@
+name: Build LARP Wallet
+
+on:
+  push:
+    branches: [larp-wallet-v1]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk LARP-Wallet-v1.0.0.apk
+
+      - name: Package source
+        run: |
+          zip -r LARP-Wallet-source-v1.0.0.zip . \
+            -x '.git/*' '.gradle/*' '**/build/*' 'LARP-Wallet-v1.0.0.apk' 'LARP-Wallet-source-v1.0.0.zip'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LARP-Wallet-v1.0.0
+          path: |
+            LARP-Wallet-v1.0.0.apk
+            LARP-Wallet-source-v1.0.0.zip
+          if-no-files-found: error
+
+      - name: Publish release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: larp-wallet-v1.0.0
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              LARP-Wallet-v1.0.0.apk \
+              LARP-Wallet-source-v1.0.0.zip \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              LARP-Wallet-v1.0.0.apk \
+              LARP-Wallet-source-v1.0.0.zip \
+              --target "$GITHUB_SHA" \
+              --title "LARP Wallet v1.0.0" \
+              --notes "Carteira cenográfica Android. Todos os saldos e eventos são fictícios; o app não usa blockchain, seed phrase ou chaves privadas."
+          fi
